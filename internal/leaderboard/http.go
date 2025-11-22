@@ -32,7 +32,8 @@ func NewHTTPHandler(svc *Service, queries *sqlcgen.Queries, logger zerolog.Logge
 
 // HandleGet responds with the current leaderboard for a given window or private room.
 // Routes: GET /v1/leaderboards/{window}?limit=10
-//         GET /v1/leaderboards/private/{room_code}?limit=10
+//
+//	GET /v1/leaderboards/private/{room_code}?limit=10
 func (h *HTTPHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -41,7 +42,7 @@ func (h *HTTPHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 	path := strings.TrimPrefix(r.URL.Path, "/v1/leaderboards/")
 	path = strings.TrimSuffix(path, "/")
-	
+
 	// Check if it's a private room request
 	if strings.HasPrefix(path, "private/") {
 		h.HandleGetPrivateRoom(w, r)

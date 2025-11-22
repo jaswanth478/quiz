@@ -17,4 +17,3 @@ func toWSEntries(entries []Entry) []ws.LeaderboardEntry {
 	}
 	return result
 }
-

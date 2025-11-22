@@ -31,7 +31,6 @@ const (
 	PlayerStatusTimeout   = "timeout"
 )
 
-
 // Match represents a game session.
 type Match struct {
 	ID                   uuid.UUID

@@ -78,11 +78,11 @@ func (e *Engine) CalculateScore(
 // AnswerRecord represents a single answer for scoring (duplicated here to avoid import cycle).
 type AnswerRecord struct {
 	QuestionOrder int       `json:"question_order"`
-	QuestionToken  string    `json:"question_token"`
-	Answer         string    `json:"answer"`
-	SubmittedAt    time.Time `json:"submitted_at"`
-	IsCorrect      bool      `json:"is_correct"`
-	ScoreEarned    int       `json:"score_earned"`
+	QuestionToken string    `json:"question_token"`
+	Answer        string    `json:"answer"`
+	SubmittedAt   time.Time `json:"submitted_at"`
+	IsCorrect     bool      `json:"is_correct"`
+	ScoreEarned   int       `json:"score_earned"`
 }
 
 // ComputeFinalScore aggregates all answers and returns total + accuracy + streak bonus percentage.

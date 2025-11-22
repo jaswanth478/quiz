@@ -69,7 +69,7 @@ func NewService(
 	}
 }
 
-// getFixedDifficultyDistribution 
+// getFixedDifficultyDistribution
 func getFixedDifficultyDistribution(questionCount int) map[string]int {
 	switch questionCount {
 	case 5:
@@ -141,12 +141,12 @@ func (s *Service) CreateRandomMatch(ctx context.Context, pair *queue.MatchPair, 
 	// Get both player IDs for fair uniqueness checking
 	player1ID := pair.Player1.UserID
 	player2ID := pair.Player2.UserID
-	
+
 	// Use category from request, default to "general" if empty
 	if category == "" {
 		category = "general"
 	}
-	
+
 	packReq := question.PackRequest{
 		Category:           category,
 		DifficultyCounts:   diffCounts,
@@ -295,7 +295,7 @@ func (s *Service) CreatePrivateMatch(ctx context.Context, roomCode string, playe
 	if category == "" {
 		category = "general"
 	}
-	
+
 	// Private rooms: no cross-match uniqueness check
 	packReq := question.PackRequest{
 		Category:           category,
@@ -372,7 +372,7 @@ func (s *Service) CreatePrivateMatch(ctx context.Context, roomCode string, playe
 		PerQuestionSeconds:   perQuestionSec,
 		GlobalTimeoutSeconds: globalTimeout,
 		SeedHash:             seedHash,
-		LeaderboardEligible: true,
+		LeaderboardEligible:  true,
 		Status:               StatusPending,
 		CreatedAt:            time.Now(),
 		UpdatedAt:            time.Now(),
@@ -505,7 +505,7 @@ func (s *Service) FinalizeMatch(ctx context.Context, matchID uuid.UUID) error {
 		} else {
 			leaderboardEligible = meta.LeaderboardEligible
 			isPrivateRoom = meta.Mode == ModePrivateRoom
-			
+
 			// Extract room code from metadata if private room
 			if isPrivateRoom && len(meta.Metadata) > 0 {
 				var metadata map[string]interface{}
@@ -662,7 +662,7 @@ func (s *Service) FinalizeMatch(ctx context.Context, matchID uuid.UUID) error {
 		}
 		for i := range leaderboardReqs {
 			leaderboardReqs[i].Won = leaderboardReqs[i].Score == highest
-			
+
 			// Route to appropriate leaderboard based on match mode
 			if isPrivateRoom && roomCode != "" {
 				// Private room leaderboard (separate from main)

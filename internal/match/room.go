@@ -68,7 +68,7 @@ func (r *RoomManager) CreateRoom(ctx context.Context, req PrivateRoomRequest) (s
 	if category == "" {
 		category = "general"
 	}
-	
+
 	room := &PrivateRoom{
 		RoomCode:           code,
 		HostID:             req.HostID,
@@ -130,7 +130,7 @@ func (r *RoomManager) JoinRoom(ctx context.Context, roomCode string, userID uuid
 			return nil, fmt.Errorf("user already in room") // prevent duplicate joins
 		}
 	}
-	
+
 	// Prevent host from joining their own room again
 	if userID == room.HostID {
 		return nil, fmt.Errorf("host cannot join their own room again")
@@ -204,7 +204,7 @@ func (r *RoomManager) generateRoomCode() string {
 		// Using 100000-999999 to ensure 6 digits (avoid leading zeros)
 		num := 100000 + rand.Intn(900000)
 		code := fmt.Sprintf("%06d", num)
-		
+
 		// Ensure uniqueness
 		r.mu.RLock()
 		_, exists := r.rooms[code]

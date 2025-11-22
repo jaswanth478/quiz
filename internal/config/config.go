@@ -78,10 +78,10 @@ type AI struct {
 
 // SMTP holds email server configuration.
 type SMTP struct {
-	Host     string `env:"SMTP_HOST"`
-	Port     int    `env:"SMTP_PORT" envDefault:"587"`
-	Username string `env:"SMTP_USERNAME"`
-	Password string `env:"SMTP_PASSWORD"`
+	Host      string `env:"SMTP_HOST"`
+	Port      int    `env:"SMTP_PORT" envDefault:"587"`
+	Username  string `env:"SMTP_USERNAME"`
+	Password  string `env:"SMTP_PASSWORD"`
 	FromEmail string `env:"SMTP_FROM_EMAIL"`
 }
 

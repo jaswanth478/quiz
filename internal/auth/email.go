@@ -49,7 +49,7 @@ func (e *EmailService) SendPasswordResetEmail(ctx context.Context, toEmail, rese
 	}
 
 	resetURL := fmt.Sprintf("https://your-app.com/reset-password?token=%s", resetToken)
-	
+
 	tmpl := `Subject: Password Reset Request
 
 Hello,
@@ -98,4 +98,3 @@ type PasswordResetToken struct {
 	Email     string
 	ExpiresAt time.Time
 }
-

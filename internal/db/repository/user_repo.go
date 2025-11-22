@@ -61,7 +61,7 @@ func (r *UserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, p
 	pgUserID.Scan(userID)
 	pgHash := pgtype.Text{}
 	pgHash.Scan(passwordHash)
-	
+
 	params := sqlcgen.UpdatePasswordParams{
 		UserID:       pgUserID,
 		PasswordHash: pgHash,

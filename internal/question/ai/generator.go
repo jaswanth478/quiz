@@ -147,7 +147,7 @@ func normalizeAIQuestion(q aiQuestion) question.Question {
 	if len(options) == 0 {
 		options = []string{q.Answer}
 	}
-	
+
 	// Ensure answer present in options
 	found := false
 	for _, opt := range options {
@@ -184,10 +184,10 @@ type generatorRequest struct {
 }
 
 type aiQuestion struct {
-	ID         string   `json:"id"`
-	Prompt     string   `json:"prompt"`
-	Options    []string `json:"options"`
-	Answer     string   `json:"answer"`
+	ID      string   `json:"id"`
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+	Answer  string   `json:"answer"`
 	// Type, Difficulty, Category removed - not needed from Gemini
 	// Server will infer Type from options count and set defaults
 }

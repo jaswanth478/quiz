@@ -20,11 +20,11 @@ import (
 
 // Service handles authentication and user management.
 type Service struct {
-	userRepo    *repository.UserRepository
-	tokenMgr    *jwt.Manager
-	redis       *redis.Client
-	emailSvc    *EmailService
-	logger      zerolog.Logger
+	userRepo *repository.UserRepository
+	tokenMgr *jwt.Manager
+	redis    *redis.Client
+	emailSvc *EmailService
+	logger   zerolog.Logger
 }
 
 // ServiceOptions configures the auth service.

@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"os"
-	"log"
-	"time"
-	"github.com/joho/godotenv"
 	"github.com/gokatarajesh/quiz-platform/internal/app"
 	"github.com/gokatarajesh/quiz-platform/internal/config"
+	"github.com/joho/godotenv"
+	"log"
+	"os"
+	"time"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 			log.Printf("Warning: could not load .env file: %v", err)
 		}
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

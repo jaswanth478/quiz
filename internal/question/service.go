@@ -68,7 +68,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 
 	result := make([]Question, 0, req.TotalQuestions)
 	remainingNeeds := make(map[string]int)
-	
+
 	// 1. Fetch Curated Questions
 	// We still fetch curated questions per difficulty because the DB query is optimized for that.
 	// This is fast enough to keep sequential or we could parallelize if needed.
@@ -78,7 +78,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 			return PackResponse{}, err
 		}
 		result = append(result, curated...)
-		
+
 		needed := count - len(curated)
 		if needed > 0 {
 			remainingNeeds[diff] = needed
@@ -96,7 +96,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 		if err != nil {
 			return PackResponse{}, fmt.Errorf("ai fallback failed: %w", err)
 		}
-		
+
 		// Distribute AI questions to results
 		// Note: AI might return slightly different distribution, we take what we get
 		result = append(result, aiQs...)
@@ -107,7 +107,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 	for i, q := range result {
 		questionIDs[i] = q.ID
 	}
-	
+
 	uniqueIDs, hasDuplicates := checkWithinMatchDuplicates(questionIDs)
 	if hasDuplicates {
 		// Filter out duplicates and regenerate if needed
@@ -115,14 +115,14 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 		for _, id := range uniqueIDs {
 			uniqueMap[id] = true
 		}
-		
+
 		filtered := make([]Question, 0, len(uniqueIDs))
 		for _, q := range result {
 			if uniqueMap[q.ID] {
 				filtered = append(filtered, q)
 			}
 		}
-		
+
 		// If we lost questions due to duplicates, regenerate
 		needed := req.TotalQuestions - len(filtered)
 		if needed > 0 {
@@ -134,14 +134,14 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 				proportion := float64(count) / float64(req.TotalQuestions)
 				regenerateNeeds[diff] = int(float64(needed) * proportion)
 			}
-			
+
 			// Ensure we have at least one question per difficulty if original had it
 			for diff, origCount := range req.DifficultyCounts {
 				if origCount > 0 && regenerateNeeds[diff] == 0 {
 					regenerateNeeds[diff] = 1
 				}
 			}
-			
+
 			additionalQs, err := s.fetchAIMixed(ctx, req.Category, regenerateNeeds, fmt.Sprintf("%s-retry", req.Seed))
 			if err == nil {
 				// Check new questions for duplicates with existing
@@ -149,7 +149,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 				for _, q := range filtered {
 					existingIDMap[q.ID] = true
 				}
-				
+
 				for _, q := range additionalQs {
 					if !existingIDMap[q.ID] && len(filtered) < req.TotalQuestions {
 						filtered = append(filtered, q)
@@ -158,7 +158,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 				}
 			}
 		}
-		
+
 		result = filtered
 	}
 
@@ -166,7 +166,7 @@ func (s *Service) FetchPack(ctx context.Context, req PackRequest) (PackResponse,
 	if len(result) < req.TotalQuestions {
 		return PackResponse{}, fmt.Errorf("insufficient questions: need %d got %d", req.TotalQuestions, len(result))
 	}
-	
+
 	// Trim if we somehow got too many (unlikely with this logic but safe)
 	if len(result) > req.TotalQuestions {
 		result = result[:req.TotalQuestions]
@@ -407,7 +407,7 @@ func (s *Service) fetchAIMixed(ctx context.Context, category string, needs map[s
 	if s.ai == nil {
 		return nil, fmt.Errorf("ai generator unavailable")
 	}
-	
+
 	total := 0
 	for _, c := range needs {
 		total += c
@@ -568,21 +568,21 @@ func (s *Service) AddUserQuestionHistory(ctx context.Context, userID uuid.UUID, 
 	}
 
 	key := fmt.Sprintf("user:questions:%s", userID.String())
-	
+
 	// Add all question IDs to set
 	members := make([]interface{}, len(questionIDs))
 	for i, id := range questionIDs {
 		members[i] = id
 	}
-	
+
 	if err := s.redis.SAdd(ctx, key, members...).Err(); err != nil {
 		return fmt.Errorf("add question history: %w", err)
 	}
-	
+
 	// Set 10-day TTL
 	if err := s.redis.Expire(ctx, key, 10*24*time.Hour).Err(); err != nil {
 		return fmt.Errorf("set question history TTL: %w", err)
 	}
-	
+
 	return nil
 }

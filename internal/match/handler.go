@@ -17,10 +17,10 @@ import (
 
 // Handler manages WebSocket connections and routes match-related messages.
 type Handler struct {
-	service  *Service
-	hub      *ws.Hub
-	authSvc  *auth.Service
-	logger   zerolog.Logger
+	service *Service
+	hub     *ws.Hub
+	authSvc *auth.Service
+	logger  zerolog.Logger
 }
 
 // NewHandler creates a match WebSocket handler.
@@ -86,7 +86,7 @@ func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, display
 	if category == "" {
 		category = "general"
 	}
-	
+
 	// Enqueue player
 	queueToken, pair, err := h.service.queueMgr.Enqueue(ctx, queue.MatchmakingRequest{
 		UserID:            userID,
@@ -99,17 +99,17 @@ func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, display
 		return h.sendError(userID, "enqueue_failed", err.Error())
 	}
 
-		// If match found immediately
-		if pair != nil {
-			questionCount := req.QuestionCount
-			if questionCount == 0 {
-				questionCount = 10 // default
-			}
-			// Validate question count (must be 5, 10, or 15)
-			if questionCount != 5 && questionCount != 10 && questionCount != 15 {
-				questionCount = 10 // fallback to default
-			}
-			match, questions, err := h.service.CreateRandomMatch(ctx, pair, questionCount, 15, category)
+	// If match found immediately
+	if pair != nil {
+		questionCount := req.QuestionCount
+		if questionCount == 0 {
+			questionCount = 10 // default
+		}
+		// Validate question count (must be 5, 10, or 15)
+		if questionCount != 5 && questionCount != 10 && questionCount != 15 {
+			questionCount = 10 // fallback to default
+		}
+		match, questions, err := h.service.CreateRandomMatch(ctx, pair, questionCount, 15, category)
 		if err != nil {
 			return h.sendError(userID, "match_creation_failed", err.Error())
 		}
@@ -190,7 +190,7 @@ func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, displ
 	// Check if this is the first non-host player joining (trigger question generation)
 	wasWaiting := len(room.Players) == 2
 	isNonHost := userID != room.HostID
-	
+
 	if wasWaiting && isNonHost && room.MatchID == nil {
 		// First non-host player joined - generate questions
 		players := make([]RoomPlayer, len(room.Players))
@@ -202,23 +202,23 @@ func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, displ
 				IsHost:      p.IsHost,
 			}
 		}
-		
+
 		match, questions, err := h.service.CreatePrivateMatch(ctx, req.RoomCode, players, room.QuestionCount, room.PerQuestionSeconds, room.Category)
 		if err != nil {
 			return h.sendError(userID, "match_creation_failed", err.Error())
 		}
-		
+
 		// Update room with match ID
 		_, err = h.service.roomMgr.StartRoom(ctx, req.RoomCode, match.ID, room.StartCountdown)
 		if err != nil {
 			return h.sendError(userID, "room_start_failed", err.Error())
 		}
-		
+
 		// Join all players to match in hub
 		for _, p := range room.Players {
 			h.hub.JoinMatch(match.ID, p.UserID)
 		}
-		
+
 		// Store questions in room state (they'll be sent when match actually starts)
 		// For now, we'll send them immediately after countdown
 		// TODO: Implement countdown logic and send questions after countdown
