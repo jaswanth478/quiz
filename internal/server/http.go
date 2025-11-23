@@ -60,6 +60,7 @@ func NewHTTPServer(cfg *config.App, logger zerolog.Logger, pool *pgxpool.Pool, r
 		mux.HandleFunc("/v1/oauth/{provider}/start", authHandlers.OAuthStart)
 		mux.HandleFunc("/v1/oauth/{provider}/callback", authHandlers.OAuthCallback)
 		mux.HandleFunc("/v1/users/me", authHandlers.GetMe)
+		mux.HandleFunc("/v1/users/me/username", authHandlers.SetUsername)
 	}
 
 	// WebSocket endpoint

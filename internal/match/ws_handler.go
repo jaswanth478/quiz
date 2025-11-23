@@ -32,9 +32,9 @@ func (h *Handler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	// Extract user info from claims
 	userID := claims.UserID
-	displayName := claims.DisplayName
+	username := claims.Username
 	isGuest := claims.IsGuest
 
 	// Handle connection
-	h.HandleConnection(conn, userID, displayName, isGuest)
+	h.HandleConnection(conn, userID, username, isGuest)
 }

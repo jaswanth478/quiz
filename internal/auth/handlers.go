@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rs/zerolog"
 
 	"github.com/gokatarajesh/quiz-platform/internal/auth/jwt"
@@ -46,11 +47,14 @@ func (h *HTTPHandlers) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	usernameRequired := user.Username == ""
+
 	h.respondJSON(w, http.StatusCreated, map[string]interface{}{
-		"user_id":       user.ID.String(),
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"expires_in":    tokens.ExpiresIn,
+		"user_id":          user.ID.String(),
+		"access_token":     tokens.AccessToken,
+		"refresh_token":    tokens.RefreshToken,
+		"expires_in":       tokens.ExpiresIn,
+		"username_required": usernameRequired,
 	})
 }
 
@@ -73,11 +77,14 @@ func (h *HTTPHandlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	usernameRequired := user.Username == ""
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"user_id":       user.ID.String(),
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"expires_in":    tokens.ExpiresIn,
+		"user_id":          user.ID.String(),
+		"access_token":     tokens.AccessToken,
+		"refresh_token":    tokens.RefreshToken,
+		"expires_in":       tokens.ExpiresIn,
+		"username_required": usernameRequired,
 	})
 }
 
@@ -94,10 +101,6 @@ func (h *HTTPHandlers) CreateGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.DisplayName == "" {
-		req.DisplayName = "Guest"
-	}
-
 	user, tokens, err := h.authSvc.CreateGuest(r.Context(), req)
 	if err != nil {
 		h.respondError(w, http.StatusBadRequest, "guest_creation_failed", err.Error())
@@ -106,6 +109,7 @@ func (h *HTTPHandlers) CreateGuest(w http.ResponseWriter, r *http.Request) {
 
 	h.respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"guest_id":      user.ID.String(),
+		"username":      user.Username,
 		"access_token":  tokens.AccessToken,
 		"refresh_token": tokens.RefreshToken,
 		"expires_in":    tokens.ExpiresIn,
@@ -265,11 +269,14 @@ func (h *HTTPHandlers) OAuthCallback(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
+	usernameRequired := user.Username == ""
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"user_id":       user.ID.String(),
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"expires_in":    tokens.ExpiresIn,
+		"user_id":          user.ID.String(),
+		"access_token":     tokens.AccessToken,
+		"refresh_token":    tokens.RefreshToken,
+		"expires_in":       tokens.ExpiresIn,
+		"username_required": usernameRequired,
 	})
 }
 
@@ -287,12 +294,91 @@ func (h *HTTPHandlers) GetMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch full user data from DB to check username
+	userID := claims.UserID
+	username := claims.Username // Default to token username (works for guests)
+	usernameRequired := false
+	
+	// For registered users, check DB to see if username is set
+	if !claims.IsGuest {
+		var pgUserID pgtype.UUID
+		pgUserID.Scan(claims.UserID)
+		dbUser, err := h.authSvc.userRepo.GetByID(r.Context(), pgUserID)
+		if err == nil {
+			if dbUser.Username != "" {
+				username = dbUser.Username
+				usernameRequired = false
+			} else {
+				username = ""
+				usernameRequired = true
+			}
+		}
+	}
+
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{
-		"user_id":      claims.UserID.String(),
-		"email":        claims.Email,
-		"display_name": claims.DisplayName,
-		"user_type":    claims.UserID,
-		"is_guest":     claims.IsGuest,
+		"user_id":          userID.String(),
+		"email":            claims.Email,
+		"username":         username,
+		"username_required": usernameRequired,
+		"user_type":        claims.UserType,
+		"is_guest":         claims.IsGuest,
+	})
+}
+
+// SetUsername handles POST /v1/users/me/username (requires auth middleware)
+func (h *HTTPHandlers) SetUsername(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract user from context (set by auth middleware)
+	claims, ok := r.Context().Value("claims").(*jwt.Claims)
+	if !ok {
+		h.respondError(w, http.StatusUnauthorized, "unauthorized", "Invalid or missing token")
+		return
+	}
+
+	var req SetUsernameRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.respondError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON payload")
+		return
+	}
+
+	if req.Username == "" {
+		h.respondError(w, http.StatusBadRequest, "invalid_request", "Username required")
+		return
+	}
+
+	user, err := h.authSvc.SetUsername(r.Context(), claims.UserID, req.Username)
+	if err != nil {
+		// Check if it's a username_taken error with suggestions
+		errStr := err.Error()
+		if strings.Contains(errStr, "username_taken") {
+			// Extract suggestions from error message (format: "username_taken: [suggestion1 suggestion2 suggestion3]")
+			parts := strings.Split(errStr, ": ")
+			if len(parts) > 1 {
+				// Parse the suggestions array from the string
+				suggestionsStr := strings.Trim(parts[1], "[]")
+				suggestions := strings.Fields(suggestionsStr)
+				h.respondJSON(w, http.StatusConflict, map[string]interface{}{
+					"error":       "username_taken",
+					"message":     "Username is already taken",
+					"suggestions": suggestions,
+				})
+				return
+			}
+		}
+		h.respondError(w, http.StatusBadRequest, "set_username_failed", err.Error())
+		return
+	}
+
+	h.respondJSON(w, http.StatusOK, map[string]interface{}{
+		"user_id":   user.ID.String(),
+		"username":  user.Username,
+		"email":     user.Email,
+		"user_type": user.UserType,
+		"is_guest":  user.IsGuest,
 	})
 }
 

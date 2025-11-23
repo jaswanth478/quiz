@@ -35,7 +35,7 @@ func NewHandler(service *Service, hub *ws.Hub, authSvc *auth.Service, logger zer
 
 // HandleConnection processes a new WebSocket connection.
 // Token should be validated before calling this (extract userID from JWT claims).
-func (h *Handler) HandleConnection(conn *websocket.Conn, userID uuid.UUID, displayName string, isGuest bool) {
+func (h *Handler) HandleConnection(conn *websocket.Conn, userID uuid.UUID, username string, isGuest bool) {
 	wsConn := ws.NewConnection(conn, h.logger)
 	h.hub.RegisterConnection(userID, wsConn)
 
@@ -44,7 +44,7 @@ func (h *Handler) HandleConnection(conn *websocket.Conn, userID uuid.UUID, displ
 
 	// Handle incoming messages
 	wsConn.ReadPump(func(msg ws.Message) error {
-		return h.handleMessage(context.Background(), userID, displayName, isGuest, msg)
+		return h.handleMessage(context.Background(), userID, username, isGuest, msg)
 	})
 
 	// Cleanup on disconnect
@@ -52,16 +52,16 @@ func (h *Handler) HandleConnection(conn *websocket.Conn, userID uuid.UUID, displ
 }
 
 // handleMessage routes incoming WebSocket messages.
-func (h *Handler) handleMessage(ctx context.Context, userID uuid.UUID, displayName string, isGuest bool, msg ws.Message) error {
+func (h *Handler) handleMessage(ctx context.Context, userID uuid.UUID, username string, isGuest bool, msg ws.Message) error {
 	switch msg.Type {
 	case ws.TypeJoinQueue:
-		return h.handleJoinQueue(ctx, userID, displayName, isGuest, msg.Payload)
+		return h.handleJoinQueue(ctx, userID, username, isGuest, msg.Payload)
 	case ws.TypeCancelQueue:
 		return h.handleCancelQueue(ctx, userID, msg.Payload)
 	case ws.TypeAcceptBotFill:
 		return h.handleAcceptBotFill(ctx, userID, msg.Payload)
 	case ws.TypeJoinPrivate:
-		return h.handleJoinPrivate(ctx, userID, displayName, isGuest, msg.Payload)
+		return h.handleJoinPrivate(ctx, userID, username, isGuest, msg.Payload)
 	case ws.TypeReadyState:
 		return h.handleReadyState(ctx, userID, msg.Payload)
 	case ws.TypeSubmitAnswer:
@@ -75,7 +75,7 @@ func (h *Handler) handleMessage(ctx context.Context, userID uuid.UUID, displayNa
 	}
 }
 
-func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, displayName string, isGuest bool, payload json.RawMessage) error {
+func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, username string, isGuest bool, payload json.RawMessage) error {
 	var req ws.JoinQueuePayload
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return h.sendError(userID, "invalid_payload", "Invalid join_queue payload")
@@ -90,7 +90,7 @@ func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, display
 	// Enqueue player
 	queueToken, pair, err := h.service.queueMgr.Enqueue(ctx, queue.MatchmakingRequest{
 		UserID:            userID,
-		DisplayName:       displayName,
+		Username:          username,
 		IsGuest:           isGuest,
 		PreferredCategory: category,
 		BotOK:             true,
@@ -131,8 +131,8 @@ func (h *Handler) handleJoinQueue(ctx context.Context, userID uuid.UUID, display
 			PerQuestionSeconds:   match.PerQuestionSeconds,
 			GlobalTimeoutSeconds: match.GlobalTimeoutSeconds,
 			Players: []ws.Player{
-				{UserID: pair.Player1.UserID.String(), DisplayName: pair.Player1.DisplayName},
-				{UserID: pair.Player2.UserID.String(), DisplayName: pair.Player2.DisplayName},
+				{UserID: pair.Player1.UserID.String(), Username: pair.Player1.Username},
+				{UserID: pair.Player2.UserID.String(), Username: pair.Player2.Username},
 			},
 		}
 
@@ -176,13 +176,13 @@ func (h *Handler) handleAcceptBotFill(ctx context.Context, userID uuid.UUID, pay
 	return h.sendError(userID, "not_implemented", "Bot fill not yet implemented")
 }
 
-func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, displayName string, isGuest bool, payload json.RawMessage) error {
+func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, username string, isGuest bool, payload json.RawMessage) error {
 	var req ws.JoinPrivatePayload
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return h.sendError(userID, "invalid_payload", "Invalid join_private payload")
 	}
 
-	room, err := h.service.roomMgr.JoinRoom(ctx, req.RoomCode, userID, displayName, isGuest)
+	room, err := h.service.roomMgr.JoinRoom(ctx, req.RoomCode, userID, username, isGuest)
 	if err != nil {
 		return h.sendError(userID, "join_failed", err.Error())
 	}
@@ -196,10 +196,10 @@ func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, displ
 		players := make([]RoomPlayer, len(room.Players))
 		for i, p := range room.Players {
 			players[i] = RoomPlayer{
-				UserID:      p.UserID,
-				DisplayName: p.DisplayName,
-				IsGuest:     p.IsGuest,
-				IsHost:      p.IsHost,
+				UserID:   p.UserID,
+				Username: p.Username,
+				IsGuest:  p.IsGuest,
+				IsHost:   p.IsHost,
 			}
 		}
 
@@ -229,8 +229,8 @@ func (h *Handler) handleJoinPrivate(ctx context.Context, userID uuid.UUID, displ
 	wsPlayers := make([]ws.Player, len(room.Players))
 	for i, p := range room.Players {
 		wsPlayers[i] = ws.Player{
-			UserID:      p.UserID.String(),
-			DisplayName: p.DisplayName,
+			UserID:   p.UserID.String(),
+			Username: p.Username,
 		}
 	}
 

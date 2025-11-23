@@ -21,12 +21,12 @@ var sem = make(chan struct{}, maxConcurrentRequests)
 
 // RateLimiter implements a token bucket rate limiter with request queuing
 type RateLimiter struct {
-	tokens     chan struct{}      // Token bucket channel
-	queue      chan chan struct{} // Request queue
-	maxWait    time.Duration      // Maximum wait time for queued requests
-	refillRate time.Duration      // Time between token refills
-	stop       chan struct{}      // Stop signal for refill goroutine
-	wg         sync.WaitGroup     // Wait group for cleanup
+	tokens      chan struct{}     // Token bucket channel
+	queue       chan chan struct{} // Request queue
+	maxWait     time.Duration     // Maximum wait time for queued requests
+	refillRate  time.Duration     // Time between token refills
+	stop        chan struct{}     // Stop signal for refill goroutine
+	wg          sync.WaitGroup    // Wait group for cleanup
 }
 
 // NewRateLimiter creates a new rate limiter with specified RPM and max wait time
@@ -42,7 +42,7 @@ func NewRateLimiter(rpm int, maxWaitSeconds int) *RateLimiter {
 	refillRate := time.Duration(60/rpm) * time.Second
 
 	rl := &RateLimiter{
-		tokens:     make(chan struct{}, rpm),      // Bucket size = RPM
+		tokens:     make(chan struct{}, rpm), // Bucket size = RPM
 		queue:      make(chan chan struct{}, 100), // Queue up to 100 requests
 		maxWait:    time.Duration(maxWaitSeconds) * time.Second,
 		refillRate: refillRate,
@@ -164,10 +164,10 @@ type generateResponse struct {
 }
 
 type questionPayload struct {
-	ID      string   `json:"id"`
-	Prompt  string   `json:"prompt"`
-	Options []string `json:"options"`
-	Answer  string   `json:"answer"`
+	ID         string   `json:"id"`
+	Prompt     string   `json:"prompt"`
+	Options    []string `json:"options"`
+	Answer     string   `json:"answer"`
 	// Type, Difficulty, Category removed - not needed from Gemini
 	// Server will infer Type from options count and set defaults
 }
@@ -212,8 +212,8 @@ func main() {
 		client: &http.Client{
 			Timeout: 60 * time.Second, // Increased timeout for larger batches
 			Transport: &http.Transport{
-				MaxIdleConns:        200, // allow many parallel calls
-				MaxIdleConnsPerHost: 200, // allow many Gemini requests
+				MaxIdleConns:        200,   // allow many parallel calls
+				MaxIdleConnsPerHost: 200,   // allow many Gemini requests
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
@@ -248,18 +248,18 @@ func (s *server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("invalid payload: %v", err), http.StatusBadRequest)
 		return
 	}
-
+	
 	// Auto-calculate difficulty_counts if not provided
 	if len(req.DifficultyCounts) == 0 {
 		req.DifficultyCounts = getDefaultDifficultyDistribution(req.Count)
 	}
-
+	
 	// Rate limiting: acquire token before proceeding
 	if !s.rateLimiter.Acquire(r.Context()) {
 		http.Error(w, "rate limit exceeded: request queued for too long", http.StatusTooManyRequests)
 		return
 	}
-
+	
 	// Concurrency throttling (existing semaphore)
 	select {
 	case sem <- struct{}{}:
@@ -302,8 +302,8 @@ func (s *server) generateFromGemini(ctx context.Context, req generateRequest) ([
 			},
 		},
 		GenerationConfig: map[string]interface{}{
-			"temperature":      0.4,
-			"maxOutputTokens":  8192,               // Increased for larger batches
+			"temperature":     0.4,
+			"maxOutputTokens": 8192, // Increased for larger batches
 			"responseMimeType": "application/json", // Force JSON mode for newer models
 		},
 	}
@@ -362,7 +362,7 @@ func (s *server) generateFromGemini(ctx context.Context, req generateRequest) ([
 					// Normalize questions
 					return normalizeQuestions(payload.Questions, req), nil
 				}
-
+				
 				// Sometimes models return just the list array
 				var qList []questionPayload
 				err = json.Unmarshal([]byte(raw), &qList)
@@ -411,7 +411,7 @@ func cleanJSON(raw string) string {
 	// Cut off leading junk before first { or [
 	iObj := strings.Index(raw, "{")
 	iArr := strings.Index(raw, "[")
-
+	
 	start := -1
 	if iObj >= 0 && (iArr == -1 || iObj < iArr) {
 		start = iObj
@@ -426,7 +426,7 @@ func cleanJSON(raw string) string {
 	// Cut off trailing junk after last } or ]
 	jObj := strings.LastIndex(raw, "}")
 	jArr := strings.LastIndex(raw, "]")
-
+	
 	end := -1
 	if jObj >= 0 && (jArr == -1 || jObj > jArr) {
 		end = jObj
@@ -509,9 +509,9 @@ func getDefaultDifficultyDistribution(count int) map[string]int {
 	default:
 		// Fallback to 10-question distribution
 		return map[string]int{
-			"easy":   5,
+			"easy":   4,
 			"medium": 3,
-			"hard":   2,
+			"hard":   3,
 		}
 	}
 }

@@ -23,7 +23,7 @@ type Manager struct {
 // WaitingPlayer represents a queued player.
 type WaitingPlayer struct {
 	UserID              uuid.UUID
-	DisplayName         string
+	Username            string
 	IsGuest             bool
 	PreferredCategory   string
 	PreferredDifficulty string
@@ -54,7 +54,7 @@ func (m *Manager) Enqueue(ctx context.Context, req MatchmakingRequest) (uuid.UUI
 	queueToken := uuid.New()
 	player := &WaitingPlayer{
 		UserID:              req.UserID,
-		DisplayName:         req.DisplayName,
+		Username:            req.Username,
 		IsGuest:             req.IsGuest,
 		PreferredCategory:   req.PreferredCategory,
 		PreferredDifficulty: req.PreferredDifficulty,
@@ -140,7 +140,7 @@ type MatchPair struct {
 // MatchmakingRequest mirrors the match package type for queue isolation.
 type MatchmakingRequest struct {
 	UserID              uuid.UUID
-	DisplayName         string
+	Username            string
 	IsGuest             bool
 	PreferredCategory   string
 	PreferredDifficulty string

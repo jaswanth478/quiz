@@ -53,7 +53,7 @@ type PlayerState struct {
 	MatchID        uuid.UUID
 	UserID         uuid.UUID
 	IsGuest        bool
-	DisplayName    string
+	Username       string
 	JoinedAt       time.Time
 	LeftAt         *time.Time
 	FinalScore     *int
@@ -76,7 +76,7 @@ type AnswerRecord struct {
 // MatchmakingRequest for random 1v1 queue.
 type MatchmakingRequest struct {
 	UserID              uuid.UUID
-	DisplayName         string
+	Username            string
 	IsGuest             bool
 	PreferredCategory   string
 	PreferredDifficulty string
@@ -86,7 +86,8 @@ type MatchmakingRequest struct {
 // PrivateRoomRequest for creating/joining private matches.
 type PrivateRoomRequest struct {
 	HostID             uuid.UUID
-	DisplayName        string
+	Username           string
+	IsGuest            bool
 	MatchName          string
 	MaxPlayers         int
 	QuestionCount      int

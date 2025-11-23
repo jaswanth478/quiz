@@ -27,7 +27,7 @@ var defaultWindows = []string{WindowDaily, WindowWeekly, WindowMonthly, WindowAl
 // Entry represents a leaderboard record sent to clients.
 type Entry struct {
 	UserID        uuid.UUID `json:"user_id"`
-	DisplayName   string    `json:"display_name"`
+	Username      string    `json:"username"`
 	Score         int       `json:"score"`
 	Wins          int       `json:"wins"`
 	Games         int       `json:"games"`
@@ -39,7 +39,7 @@ type Entry struct {
 // RecordRequest captures the data required to update leaderboard aggregates.
 type RecordRequest struct {
 	UserID        uuid.UUID
-	DisplayName   string
+	Username      string
 	Score         int
 	CorrectCount  int
 	QuestionCount int
@@ -127,7 +127,7 @@ func (s *Service) RecordResult(ctx context.Context, req RecordRequest) error {
 
 	entry := Entry{
 		UserID:        req.UserID,
-		DisplayName:   req.DisplayName,
+		Username:      req.Username,
 		Score:         req.Score,
 		Wins:          boolToInt(req.Won),
 		Games:         1,
@@ -188,7 +188,7 @@ func (s *Service) updateWindow(ctx context.Context, window string, entry Entry) 
 	pipe.HIncrBy(ctx, metaKey, "correct", int64(entry.CorrectTotal))
 	pipe.HIncrBy(ctx, metaKey, "questions", int64(entry.QuestionTotal))
 	pipe.HSet(ctx, metaKey, map[string]interface{}{
-		"display_name": entry.DisplayName,
+		"username": entry.Username,
 	})
 	if s.entryTTL > 0 && window != WindowAllTime {
 		pipe.Expire(ctx, zKey, s.entryTTL)
@@ -241,7 +241,7 @@ func (s *Service) readMeta(ctx context.Context, window string, userIDStr string)
 	}
 
 	entry := &Entry{UserID: uuid.MustParse(userIDStr)}
-	entry.DisplayName = data["display_name"]
+	entry.Username = data["username"]
 	entry.Wins = parseInt(data["wins"])
 	entry.Games = parseInt(data["games"])
 	entry.CorrectTotal = parseInt(data["correct"])
@@ -273,7 +273,7 @@ func (s *Service) RecordPrivateRoomResult(ctx context.Context, roomCode string, 
 
 	entry := Entry{
 		UserID:        req.UserID,
-		DisplayName:   req.DisplayName,
+		Username:      req.Username,
 		Score:         req.Score,
 		Wins:          boolToInt(req.Won),
 		Games:         1,
@@ -293,7 +293,7 @@ func (s *Service) RecordPrivateRoomResult(ctx context.Context, roomCode string, 
 	pipe.HIncrBy(ctx, metaKey, "correct", int64(entry.CorrectTotal))
 	pipe.HIncrBy(ctx, metaKey, "questions", int64(entry.QuestionTotal))
 	pipe.HSet(ctx, metaKey, map[string]interface{}{
-		"display_name": entry.DisplayName,
+		"username": entry.Username,
 	})
 	// Private room leaderboards expire after 7 days of inactivity
 	pipe.Expire(ctx, zKey, 7*24*time.Hour)
@@ -350,7 +350,7 @@ func (s *Service) readPrivateRoomMeta(ctx context.Context, roomCode string, user
 	}
 
 	entry := &Entry{UserID: uuid.MustParse(userIDStr)}
-	entry.DisplayName = data["display_name"]
+	entry.Username = data["username"]
 	entry.Wins = parseInt(data["wins"])
 	entry.Games = parseInt(data["games"])
 	entry.CorrectTotal = parseInt(data["correct"])

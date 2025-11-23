@@ -81,4 +81,5 @@ type User struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	LastLoginAt  pgtype.Timestamptz `json:"last_login_at"`
 	Metadata     []byte             `json:"metadata"`
+	Username     string             `json:"username"`
 }

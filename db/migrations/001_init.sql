@@ -7,7 +7,7 @@ CREATE TABLE users (
     user_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email             CITEXT UNIQUE,
     password_hash     TEXT,
-    display_name      TEXT NOT NULL,
+    username          TEXT UNIQUE,
     user_type         TEXT NOT NULL CHECK (user_type IN ('registered', 'guest')),
     status            TEXT NOT NULL DEFAULT 'active',
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -16,6 +16,7 @@ CREATE TABLE users (
     metadata          JSONB NOT NULL DEFAULT '{}'::JSONB
 );
 CREATE INDEX idx_users_type ON users(user_type);
+CREATE INDEX idx_users_username ON users(username) WHERE username IS NOT NULL;
 
 CREATE TABLE questions (
     question_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -10,7 +10,7 @@ import (
 type User struct {
 	ID          uuid.UUID
 	Email       *string
-	DisplayName string
+	Username    string
 	UserType    string // "registered" or "guest"
 	IsGuest     bool
 }
@@ -24,9 +24,8 @@ type TokenPair struct {
 
 // RegisterRequest for email/password registration.
 type RegisterRequest struct {
-	Email       string
-	Password    string
-	DisplayName string
+	Email    string
+	Password string
 }
 
 // LoginRequest for email/password authentication.
@@ -38,7 +37,6 @@ type LoginRequest struct {
 // GuestRequest for creating ephemeral guest accounts.
 type GuestRequest struct {
 	DeviceFingerprint string
-	DisplayName       string
 }
 
 // ConvertGuestRequest upgrades a guest to registered account.
@@ -85,4 +83,9 @@ type TokenConfig struct {
 	AccessTTL     time.Duration // default: 1 hour
 	RefreshTTL    time.Duration // default: 7 days
 	Issuer        string
+}
+
+// SetUsernameRequest for setting username.
+type SetUsernameRequest struct {
+	Username string
 }

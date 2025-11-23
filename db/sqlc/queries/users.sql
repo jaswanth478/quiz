@@ -2,13 +2,13 @@
 INSERT INTO users (
     email,
     password_hash,
-    display_name,
+    username,
     user_type,
     metadata
 ) VALUES (
     sqlc.narg(email),
     sqlc.narg(password_hash),
-    sqlc.narg(display_name),
+    sqlc.narg(username),
     sqlc.narg(user_type),
     COALESCE(sqlc.narg(metadata), '{}'::jsonb)
 )
@@ -32,6 +32,7 @@ WHERE user_id = $1;
 UPDATE users
 SET email = sqlc.arg(email),
     password_hash = sqlc.arg(password_hash),
+    username = sqlc.arg(username),
     user_type = 'registered',
     updated_at = NOW()
 WHERE user_id = sqlc.arg(user_id)
@@ -42,4 +43,15 @@ UPDATE users
 SET password_hash = sqlc.arg(password_hash),
     updated_at = NOW()
 WHERE user_id = sqlc.arg(user_id);
+
+-- name: UpdateUsername :one
+UPDATE users
+SET username = sqlc.arg(username),
+    updated_at = NOW()
+WHERE user_id = sqlc.arg(user_id) AND username IS NULL
+RETURNING *;
+
+-- name: GetUserByUsername :one
+SELECT * FROM users
+WHERE username = $1;
 

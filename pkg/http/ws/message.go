@@ -105,8 +105,8 @@ type MatchFoundPayload struct {
 }
 
 type Player struct {
-	UserID      string `json:"user_id"`
-	DisplayName string `json:"display_name"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
 }
 
 type PrivateRoomUpdatePayload struct {
@@ -171,7 +171,7 @@ type MatchCompletePayload struct {
 
 type MatchResult struct {
 	UserID             string  `json:"user_id"`
-	DisplayName        string  `json:"display_name"`
+	Username           string  `json:"username"`
 	FinalScore         int     `json:"final_score"`
 	Accuracy           float64 `json:"accuracy"`
 	StreakBonusApplied float64 `json:"streak_bonus_applied"`
@@ -185,13 +185,13 @@ type LeaderboardUpdatePayload struct {
 }
 
 type LeaderboardEntry struct {
-	Rank        int     `json:"rank"`
-	UserID      string  `json:"user_id"`
-	DisplayName string  `json:"display_name"`
-	Score       int     `json:"score"`
-	Wins        int     `json:"wins"`
-	Games       int     `json:"games"`
-	Accuracy    float64 `json:"accuracy"`
+	Rank     int     `json:"rank"`
+	UserID   string  `json:"user_id"`
+	Username string  `json:"username"`
+	Score    int     `json:"score"`
+	Wins     int     `json:"wins"`
+	Games    int     `json:"games"`
+	Accuracy float64 `json:"accuracy"`
 }
 
 type MatchTimeoutPayload struct {

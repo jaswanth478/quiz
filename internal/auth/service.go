@@ -6,6 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +19,12 @@ import (
 	"github.com/gokatarajesh/quiz-platform/internal/auth/jwt"
 	"github.com/gokatarajesh/quiz-platform/internal/db/repository"
 	sqlcgen "github.com/gokatarajesh/quiz-platform/internal/db/sqlc"
+)
+
+var (
+	usernameRegex = regexp.MustCompile(`^[a-z0-9_]+$`)
+	minUsernameLength = 3
+	maxUsernameLength = 10
 )
 
 // Service handles authentication and user management.
@@ -69,15 +78,14 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*User, *To
 	// Create user
 	pgHash := pgtype.Text{}
 	pgHash.Scan(passwordHash)
-	pgDisplayName := pgtype.Text{}
-	pgDisplayName.Scan(req.DisplayName)
+	pgUsername := pgtype.Text{} // NULL for new users, will be set later
 	pgUserType := pgtype.Text{}
 	pgUserType.Scan("registered")
 
 	createParams := sqlcgen.CreateUserParams{
 		Email:        pgEmail,
 		PasswordHash: pgHash,
-		DisplayName:  pgDisplayName,
+		Username:     pgUsername, // NULL initially
 		UserType:     pgUserType,
 	}
 
@@ -87,10 +95,15 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*User, *To
 	}
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	username := ""
+	if dbUser.Username != "" {
+		username = dbUser.Username
+	}
+	
 	user := &User{
 		ID:          userID,
 		Email:       &req.Email,
-		DisplayName: req.DisplayName,
+		Username:    username,
 		UserType:    "registered",
 		IsGuest:     false,
 	}
@@ -126,9 +139,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*User, *TokenPai
 	}
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	username := ""
+	if dbUser.Username != "" {
+		username = dbUser.Username
+	}
+	
 	user := &User{
 		ID:          userID,
-		DisplayName: dbUser.DisplayName,
+		Username:    username,
 		UserType:    dbUser.UserType,
 		IsGuest:     dbUser.UserType == "guest",
 	}
@@ -152,36 +170,71 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*User, *TokenPai
 	return user, tokens, nil
 }
 
-// CreateGuest creates an ephemeral guest account.
+// generateGuestUsername generates a unique guest username.
+func (s *Service) generateGuestUsername(ctx context.Context) (string, error) {
+	const maxAttempts = 50
+	
+	for i := 0; i < maxAttempts; i++ {
+		// Generate random 6-8 character suffix
+		length := 6 + rand.Intn(3) // 6, 7, or 8
+		chars := "abcdefghijklmnopqrstuvwxyz0123456789"
+		suffix := make([]byte, length)
+		for j := range suffix {
+			suffix[j] = chars[rand.Intn(len(chars))]
+		}
+		
+		username := fmt.Sprintf("guest_%s", string(suffix))
+		
+		// Check Redis for uniqueness
+		if s.redis != nil {
+			key := fmt.Sprintf("guest:username:%s", username)
+			exists, err := s.redis.Exists(ctx, key).Result()
+			if err == nil && exists == 0 {
+				// Username available in Redis, check DB too
+				_, err := s.userRepo.GetByUsername(ctx, username)
+				if err != nil {
+					// Not found in DB, username is available
+					return username, nil
+				}
+			}
+		} else {
+			// No Redis, just check DB
+			_, err := s.userRepo.GetByUsername(ctx, username)
+			if err != nil {
+				// Not found in DB, username is available
+				return username, nil
+			}
+		}
+	}
+	
+	return "", fmt.Errorf("failed to generate unique guest username after %d attempts", maxAttempts)
+}
+
+// CreateGuest creates an ephemeral guest account with temporary username.
 func (s *Service) CreateGuest(ctx context.Context, req GuestRequest) (*User, *TokenPair, error) {
+	// Generate guest UUID
 	userID := uuid.New()
-
-	// Create guest user
-	pgDisplayName := pgtype.Text{}
-	pgDisplayName.Scan(req.DisplayName)
-	pgUserType := pgtype.Text{}
-	pgUserType.Scan("guest")
-
-	metadata, _ := json.Marshal(map[string]string{
-		"device_fingerprint": req.DeviceFingerprint,
-	})
-
-	createParams := sqlcgen.CreateUserParams{
-		Email:        pgtype.Text{}, // null for guests
-		PasswordHash: pgtype.Text{}, // null for guests
-		DisplayName:  pgDisplayName,
-		UserType:     pgUserType,
-		Metadata:     metadata,
-	}
-
-	_, err := s.userRepo.CreateRegisteredUser(ctx, createParams)
+	guestIDStr := fmt.Sprintf("guest-%s", userID.String())
+	
+	// Generate unique guest username
+	username, err := s.generateGuestUsername(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create guest: %w", err)
+		return nil, nil, fmt.Errorf("generate guest username: %w", err)
 	}
-
+	
+	// Store guest username in Redis with 1-day TTL
+	if s.redis != nil {
+		key := fmt.Sprintf("guest:username:%s", username)
+		if err := s.redis.Set(ctx, key, guestIDStr, 24*time.Hour).Err(); err != nil {
+			s.logger.Warn().Err(err).Str("username", username).Msg("failed to store guest username in Redis")
+			// Continue anyway, Redis is not critical
+		}
+	}
+	
+	// Create user object (NOT stored in DB for guests)
 	user := &User{
 		ID:          userID,
-		DisplayName: req.DisplayName,
+		Username:    username,
 		UserType:    "guest",
 		IsGuest:     true,
 	}
@@ -192,7 +245,7 @@ func (s *Service) CreateGuest(ctx context.Context, req GuestRequest) (*User, *To
 		return nil, nil, fmt.Errorf("generate tokens: %w", err)
 	}
 
-	s.logger.Info().Str("user_id", userID.String()).Msg("guest created")
+	s.logger.Info().Str("user_id", userID.String()).Str("username", username).Msg("guest created")
 
 	return user, tokens, nil
 }
@@ -216,6 +269,7 @@ func (s *Service) ConvertGuest(ctx context.Context, req ConvertGuestRequest) (*U
 		UserID:       pgGuestID,
 		Email:        pgEmail,
 		PasswordHash: pgHash,
+		Username:     "", // NULL - will be set later via SetUsername endpoint
 	}
 
 	dbUser, err := s.userRepo.PromoteGuest(ctx, convertParams)
@@ -224,10 +278,15 @@ func (s *Service) ConvertGuest(ctx context.Context, req ConvertGuestRequest) (*U
 	}
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	username := ""
+	if dbUser.Username != "" {
+		username = dbUser.Username
+	}
+	
 	user := &User{
 		ID:          userID,
 		Email:       &req.Email,
-		DisplayName: dbUser.DisplayName,
+		Username:    username,
 		UserType:    "registered",
 		IsGuest:     false,
 	}
@@ -259,9 +318,14 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 	}
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	username := ""
+	if dbUser.Username != "" {
+		username = dbUser.Username
+	}
+	
 	user := &User{
 		ID:          userID,
-		DisplayName: dbUser.DisplayName,
+		Username:    username,
 		UserType:    dbUser.UserType,
 		IsGuest:     dbUser.UserType == "guest",
 	}
@@ -272,6 +336,64 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 	}
 
 	return s.generateTokenPair(*user)
+}
+
+// SetUsername sets username for a user (one-time only, if username is NULL).
+func (s *Service) SetUsername(ctx context.Context, userID uuid.UUID, username string) (*User, error) {
+	// Validate username
+	if err := s.ValidateUsername(username); err != nil {
+		return nil, fmt.Errorf("invalid username: %w", err)
+	}
+	
+	// Trim and lowercase
+	username = strings.TrimRight(strings.ToLower(username), " ")
+	
+	// Check if username is already taken in DB
+	_, err := s.userRepo.GetByUsername(ctx, username)
+	if err == nil {
+		// Username exists in DB, generate suggestions
+		suggestions, _ := s.GenerateUsernameSuggestions(ctx, username)
+		return nil, fmt.Errorf("username_taken: %s", strings.Join(suggestions, " "))
+	}
+	
+	// Also check Redis for guest usernames if Redis is available
+	if s.redis != nil {
+		key := fmt.Sprintf("guest:username:%s", username)
+		exists, err := s.redis.Exists(ctx, key).Result()
+		if err == nil && exists > 0 {
+			// Username taken by a guest, generate suggestions
+			suggestions, _ := s.GenerateUsernameSuggestions(ctx, username)
+			return nil, fmt.Errorf("username_taken: %s", strings.Join(suggestions, " "))
+		}
+	}
+	
+	// Update username (only if currently NULL)
+	dbUser, err := s.userRepo.UpdateUsername(ctx, userID, username)
+	if err != nil {
+		return nil, fmt.Errorf("update username: %w", err)
+	}
+	
+	// Check if update actually happened (username was NULL before)
+	if dbUser.Username != username {
+		return nil, fmt.Errorf("username already set or user not found")
+	}
+	
+	userIDFromDB, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	user := &User{
+		ID:          userIDFromDB,
+		Username:    dbUser.Username,
+		UserType:    dbUser.UserType,
+		IsGuest:     dbUser.UserType == "guest",
+	}
+	
+	if dbUser.Email.Valid {
+		email := dbUser.Email.String
+		user.Email = &email
+	}
+	
+	s.logger.Info().Str("user_id", userID.String()).Str("username", username).Msg("username set")
+	
+	return user, nil
 }
 
 // ValidateToken validates an access token and returns user claims.
@@ -382,11 +504,87 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	return nil
 }
 
+// ValidateUsername checks if a username meets requirements.
+func (s *Service) ValidateUsername(username string) error {
+	// Trim trailing spaces
+	username = strings.TrimRight(username, " ")
+	
+	// Check length
+	if len(username) < minUsernameLength {
+		return fmt.Errorf("username must be at least %d characters", minUsernameLength)
+	}
+	if len(username) > maxUsernameLength {
+		return fmt.Errorf("username must be at most %d characters", maxUsernameLength)
+	}
+	
+	// Convert to lowercase
+	username = strings.ToLower(username)
+	
+	// Check format (lowercase, alphanumeric, underscores only)
+	if !usernameRegex.MatchString(username) {
+		return fmt.Errorf("username can only contain lowercase letters, numbers, and underscores")
+	}
+	
+	return nil
+}
+
+// GenerateUsernameSuggestions generates 3 available username suggestions.
+func (s *Service) GenerateUsernameSuggestions(ctx context.Context, username string) ([]string, error) {
+	// Trim and lowercase
+	username = strings.TrimRight(strings.ToLower(username), " ")
+	
+	suggestions := make([]string, 0, 3)
+	
+	// Try {username}_1, {username}_2, {username}_3
+	for i := 1; i <= 100; i++ { // Try up to 100 variations
+		candidate := fmt.Sprintf("%s_%d", username, i)
+		
+		// Check if available in DB
+		_, err := s.userRepo.GetByUsername(ctx, candidate)
+		if err != nil {
+			// Username not found, it's available
+			suggestions = append(suggestions, candidate)
+			if len(suggestions) >= 3 {
+				break
+			}
+		}
+	}
+	
+	// If we don't have 3 suggestions, try with random suffix
+	if len(suggestions) < 3 {
+		for len(suggestions) < 3 {
+			// Generate random 3-digit suffix
+			randomSuffix := rand.Intn(900) + 100 // 100-999
+			candidate := fmt.Sprintf("%s_%d", username, randomSuffix)
+			
+			// Check if already in suggestions
+			exists := false
+			for _, s := range suggestions {
+				if s == candidate {
+					exists = true
+					break
+				}
+			}
+			if exists {
+				continue
+			}
+			
+			// Check if available in DB
+			_, err := s.userRepo.GetByUsername(ctx, candidate)
+			if err != nil {
+				suggestions = append(suggestions, candidate)
+			}
+		}
+	}
+	
+	return suggestions, nil
+}
+
 func (s *Service) generateTokenPair(user User) (*TokenPair, error) {
 	jwtUser := jwt.User{
 		ID:          user.ID,
 		Email:       user.Email,
-		DisplayName: user.DisplayName,
+		Username:    user.Username,
 		UserType:    user.UserType,
 		IsGuest:     user.IsGuest,
 	}

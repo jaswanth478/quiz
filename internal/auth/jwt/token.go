@@ -10,11 +10,11 @@ import (
 
 // Claims for JWT tokens.
 type Claims struct {
-	UserID      uuid.UUID `json:"user_id"`
-	Email       string    `json:"email,omitempty"`
-	DisplayName string    `json:"display_name"`
-	UserType    string    `json:"user_type"`
-	IsGuest     bool      `json:"is_guest"`
+	UserID   uuid.UUID `json:"user_id"`
+	Email    string    `json:"email,omitempty"`
+	Username string    `json:"username"`
+	UserType string    `json:"user_type"`
+	IsGuest  bool      `json:"is_guest"`
 	jwt.RegisteredClaims
 }
 
@@ -64,22 +64,22 @@ func NewManager(cfg TokenConfig) *Manager {
 
 // User represents user data for token generation.
 type User struct {
-	ID          uuid.UUID
-	Email       *string
-	DisplayName string
-	UserType    string
-	IsGuest     bool
+	ID       uuid.UUID
+	Email    *string
+	Username string
+	UserType string
+	IsGuest  bool
 }
 
 // GenerateAccessToken creates a short-lived access token.
 func (m *Manager) GenerateAccessToken(user User) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID:      user.ID,
-		Email:       "",
-		DisplayName: user.DisplayName,
-		UserType:    user.UserType,
-		IsGuest:     user.IsGuest,
+		UserID:   user.ID,
+		Email:    "",
+		Username: user.Username,
+		UserType: user.UserType,
+		IsGuest:  user.IsGuest,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    m.issuer,
 			Subject:   user.ID.String(),
@@ -103,7 +103,7 @@ func (m *Manager) GenerateRefreshToken(user User) (string, error) {
 	claims := Claims{
 		UserID:      user.ID,
 		Email:       "",
-		DisplayName: user.DisplayName,
+		Username: user.Username,
 		UserType:    user.UserType,
 		IsGuest:     user.IsGuest,
 		RegisteredClaims: jwt.RegisteredClaims{

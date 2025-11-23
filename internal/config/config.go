@@ -28,7 +28,7 @@ type App struct {
 // Postgres captures connection info for the SQL database.
 type Postgres struct {
 	Host     string `env:"PG_HOST,notEmpty"`
-	Port     int    `env:"PG_PORT" envDefault:"5433"`
+	Port     int    `env:"PG_PORT" envDefault:"5432"`
 	User     string `env:"PG_USER,notEmpty"`
 	Password string `env:"PG_PASSWORD,notEmpty"`
 	Database string `env:"PG_DATABASE,notEmpty"`

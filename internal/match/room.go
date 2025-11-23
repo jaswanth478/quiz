@@ -38,11 +38,11 @@ type PrivateRoom struct {
 
 // RoomPlayer in a private room.
 type RoomPlayer struct {
-	UserID      uuid.UUID
-	DisplayName string
-	IsGuest     bool
-	IsHost      bool
-	JoinedAt    time.Time
+	UserID   uuid.UUID
+	Username string
+	IsGuest  bool
+	IsHost   bool
+	JoinedAt time.Time
 }
 
 const (
@@ -61,7 +61,13 @@ func NewRoomManager(redis *redis.Client, logger zerolog.Logger) *RoomManager {
 }
 
 // CreateRoom generates a unique 6-character code and initializes a room.
+// Guests cannot create rooms.
 func (r *RoomManager) CreateRoom(ctx context.Context, req PrivateRoomRequest) (string, *PrivateRoom, error) {
+	// Block guests from creating rooms
+	if req.IsGuest {
+		return "", nil, fmt.Errorf("guests cannot create private rooms")
+	}
+	
 	code := r.generateRoomCode()
 	// Default category to "general" if not provided
 	category := req.Category
@@ -79,10 +85,10 @@ func (r *RoomManager) CreateRoom(ctx context.Context, req PrivateRoomRequest) (s
 		Category:           category,
 		Players: []RoomPlayer{
 			{
-				UserID:      req.HostID,
-				DisplayName: req.DisplayName,
-				IsHost:      true,
-				JoinedAt:    time.Now(),
+				UserID:   req.HostID,
+				Username: req.Username,
+				IsHost:   true,
+				JoinedAt: time.Now(),
 			},
 		},
 		Status:         RoomStatusWaiting,
@@ -107,7 +113,7 @@ func (r *RoomManager) CreateRoom(ctx context.Context, req PrivateRoomRequest) (s
 }
 
 // JoinRoom adds a player to an existing room.
-func (r *RoomManager) JoinRoom(ctx context.Context, roomCode string, userID uuid.UUID, displayName string, isGuest bool) (*PrivateRoom, error) {
+func (r *RoomManager) JoinRoom(ctx context.Context, roomCode string, userID uuid.UUID, username string, isGuest bool) (*PrivateRoom, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -137,10 +143,10 @@ func (r *RoomManager) JoinRoom(ctx context.Context, roomCode string, userID uuid
 	}
 
 	room.Players = append(room.Players, RoomPlayer{
-		UserID:      userID,
-		DisplayName: displayName,
-		IsGuest:     isGuest,
-		JoinedAt:    time.Now(),
+		UserID:   userID,
+		Username: displayName,
+		IsGuest:  isGuest,
+		JoinedAt: time.Now(),
 	})
 
 	r.logger.Info().

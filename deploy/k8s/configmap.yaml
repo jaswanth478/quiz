@@ -7,7 +7,7 @@ data:
   APP_ENV: "production"
   HTTP_ADDR: ":8080"
   PG_HOST: "postgres"
-  PG_PORT: "5433"
+  PG_PORT: "5432"
   PG_USER: "quiz_prod"
   PG_DATABASE: "quiz_prod"
   PG_SSL_MODE: "disable"

@@ -13,9 +13,11 @@ type userStore interface {
 	CreateUser(ctx context.Context, arg sqlcgen.CreateUserParams) (sqlcgen.User, error)
 	GetUserByEmail(ctx context.Context, email pgtype.Text) (sqlcgen.User, error)
 	GetUserByID(ctx context.Context, userID pgtype.UUID) (sqlcgen.User, error)
+	GetUserByUsername(ctx context.Context, username string) (sqlcgen.User, error)
 	PromoteGuestToRegistered(ctx context.Context, arg sqlcgen.PromoteGuestToRegisteredParams) (sqlcgen.User, error)
 	UpdateUserLogin(ctx context.Context, userID pgtype.UUID) error
 	UpdatePassword(ctx context.Context, arg sqlcgen.UpdatePasswordParams) error
+	UpdateUsername(ctx context.Context, arg sqlcgen.UpdateUsernameParams) (sqlcgen.User, error)
 }
 
 // UserRepository exposes typed DB operations required by auth flows.
@@ -67,4 +69,21 @@ func (r *UserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, p
 		PasswordHash: pgHash,
 	}
 	return r.store.UpdatePassword(ctx, params)
+}
+
+// GetByUsername fetches a user by username.
+func (r *UserRepository) GetByUsername(ctx context.Context, username string) (sqlcgen.User, error) {
+	return r.store.GetUserByUsername(ctx, username)
+}
+
+// UpdateUsername sets username for a user (only if currently NULL).
+func (r *UserRepository) UpdateUsername(ctx context.Context, userID uuid.UUID, username string) (sqlcgen.User, error) {
+	pgUserID := pgtype.UUID{}
+	pgUserID.Scan(userID)
+
+	params := sqlcgen.UpdateUsernameParams{
+		UserID:   pgUserID,
+		Username: username,
+	}
+	return r.store.UpdateUsername(ctx, params)
 }

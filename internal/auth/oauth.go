@@ -139,10 +139,15 @@ func (s *OAuthService) CreateOrGetOAuthUser(ctx context.Context, authSvc *Servic
 	if err == nil && dbUser.UserID.Bytes != [16]byte{} {
 		// User exists, return with tokens
 		userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+		username := ""
+		if dbUser.Username != "" {
+			username = dbUser.Username
+		}
+		
 		user := &User{
 			ID:          userID,
 			Email:       &info.Email,
-			DisplayName: dbUser.DisplayName,
+			Username:    username,
 			UserType:    dbUser.UserType,
 			IsGuest:     false,
 		}
@@ -163,19 +168,14 @@ func (s *OAuthService) CreateOrGetOAuthUser(ctx context.Context, authSvc *Servic
 		"avatar_url":     info.AvatarURL,
 	})
 
-	pgDisplayName := pgtype.Text{}
-	if info.Name != "" {
-		pgDisplayName.Scan(info.Name)
-	} else {
-		pgDisplayName.Scan(info.Email) // fallback to email
-	}
+	pgUsername := pgtype.Text{} // NULL for new users, will be set later
 	pgUserType := pgtype.Text{}
 	pgUserType.Scan("registered")
 
 	createParams := sqlcgen.CreateUserParams{
 		Email:        pgEmail,
 		PasswordHash: pgtype.Text{}, // null for OAuth users
-		DisplayName:  pgDisplayName,
+		Username:     pgUsername,    // NULL initially
 		UserType:     pgUserType,
 		Metadata:     metadata,
 	}
@@ -186,10 +186,15 @@ func (s *OAuthService) CreateOrGetOAuthUser(ctx context.Context, authSvc *Servic
 	}
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	username := ""
+	if dbUser.Username != "" {
+		username = dbUser.Username
+	}
+	
 	user := &User{
 		ID:          userID,
 		Email:       &info.Email,
-		DisplayName: dbUser.DisplayName,
+		Username:    username,
 		UserType:    "registered",
 		IsGuest:     false,
 	}
