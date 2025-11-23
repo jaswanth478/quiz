@@ -21,11 +21,11 @@ import (
 )
 
 type stubQuestionStore struct {
-	fetch func(ctx context.Context, params sqlcgen.GetQuestionPoolParams) ([]sqlcgen.Question, error)
+	fetch func(ctx context.Context, limit int32) ([]sqlcgen.Question, error)
 }
 
-func (s *stubQuestionStore) GetQuestionPool(ctx context.Context, params sqlcgen.GetQuestionPoolParams) ([]sqlcgen.Question, error) {
-	return s.fetch(ctx, params)
+func (s *stubQuestionStore) GetQuestionPool(ctx context.Context, limit int32) ([]sqlcgen.Question, error) {
+	return s.fetch(ctx, limit)
 }
 
 func (s *stubQuestionStore) InsertQuestion(ctx context.Context, params sqlcgen.InsertQuestionParams) (sqlcgen.Question, error) {
@@ -92,7 +92,7 @@ func (s *stubAI) EnqueueCount() int {
 }
 func TestFetchPackUsesCache(t *testing.T) {
 	repo := repository.NewQuestionRepository(&stubQuestionStore{
-		fetch: func(ctx context.Context, params sqlcgen.GetQuestionPoolParams) ([]sqlcgen.Question, error) {
+		fetch: func(ctx context.Context, limit int32) ([]sqlcgen.Question, error) {
 			return []sqlcgen.Question{sqlQuestion("curated-1", DifficultyEasy)}, nil
 		},
 	})
@@ -120,7 +120,7 @@ func TestFetchPackUsesCache(t *testing.T) {
 
 func TestFetchPackFallsBackToAI(t *testing.T) {
 	repo := repository.NewQuestionRepository(&stubQuestionStore{
-		fetch: func(ctx context.Context, params sqlcgen.GetQuestionPoolParams) ([]sqlcgen.Question, error) {
+		fetch: func(ctx context.Context, limit int32) ([]sqlcgen.Question, error) {
 			return nil, nil
 		},
 	})
@@ -128,8 +128,8 @@ func TestFetchPackFallsBackToAI(t *testing.T) {
 
 	ai := &stubAI{
 		generated: []Question{
-			{ID: "ai-1", Prompt: "AI Question", Options: []string{"A", "B", "C", "D"}, Answer: "A", Difficulty: DifficultyEasy, Category: "general"},
-			{ID: "ai-2", Prompt: "AI Question 2", Options: []string{"A", "B", "C", "D"}, Answer: "B", Difficulty: DifficultyEasy, Category: "general"},
+			{ID: "ai-1", Prompt: "AI Question", Options: []string{"A", "B", "C", "D"}, Answer: "A", Source: "ai"},
+			{ID: "ai-2", Prompt: "AI Question 2", Options: []string{"A", "B", "C", "D"}, Answer: "B", Source: "ai"},
 		},
 	}
 
@@ -153,7 +153,7 @@ func TestFetchPackFallsBackToAI(t *testing.T) {
 
 func TestFetcherWorkerEnqueueAIOnFailure(t *testing.T) {
 	repo := repository.NewQuestionRepository(&stubQuestionStore{
-		fetch: func(ctx context.Context, params sqlcgen.GetQuestionPoolParams) ([]sqlcgen.Question, error) {
+		fetch: func(ctx context.Context, limit int32) ([]sqlcgen.Question, error) {
 			return nil, errors.New("db down")
 		},
 	})
@@ -193,13 +193,11 @@ func sqlQuestion(id string, difficulty string) sqlcgen.Question {
 	pgUUID.Valid = true
 	return sqlcgen.Question{
 		QuestionID:    pgUUID,
-		Type:          TypeMCQ,
 		Prompt:        "Prompt " + id,
 		Options:       []string{"A", "B", "C", "D"},
 		CorrectAnswer: "A",
-		Difficulty:    difficulty,
-		Category:      "general",
 		Source:        "curated",
+		Verified:      true,
 	}
 }
 

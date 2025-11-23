@@ -16,7 +16,6 @@ INSERT INTO users (
     email,
     password_hash,
     username,
-    display_name,
     user_type,
     metadata
 ) VALUES (
@@ -24,17 +23,15 @@ INSERT INTO users (
     $2,
     $3,
     $4,
-    $5,
-    COALESCE($6, '{}'::jsonb)
+    COALESCE($5, '{}'::jsonb)
 )
-RETURNING user_id, email, password_hash, display_name, user_type, status, created_at, updated_at, last_login_at, metadata, username
+RETURNING user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata
 `
 
 type CreateUserParams struct {
 	Email        pgtype.Text `json:"email"`
 	PasswordHash pgtype.Text `json:"password_hash"`
 	Username     pgtype.Text `json:"username"`
-	DisplayName  pgtype.Text `json:"display_name"`
 	UserType     pgtype.Text `json:"user_type"`
 	Metadata     interface{} `json:"metadata"`
 }
@@ -44,7 +41,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Email,
 		arg.PasswordHash,
 		arg.Username,
-		arg.DisplayName,
 		arg.UserType,
 		arg.Metadata,
 	)
@@ -53,20 +49,19 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.DisplayName,
+		&i.Username,
 		&i.UserType,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
 		&i.Metadata,
-		&i.Username,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT user_id, email, password_hash, display_name, user_type, status, created_at, updated_at, last_login_at, metadata, username FROM users
+SELECT user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata FROM users
 WHERE email = $1
 `
 
@@ -77,20 +72,19 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email pgtype.Text) (User, 
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.DisplayName,
+		&i.Username,
 		&i.UserType,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
 		&i.Metadata,
-		&i.Username,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, email, password_hash, display_name, user_type, status, created_at, updated_at, last_login_at, metadata, username FROM users
+SELECT user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata FROM users
 WHERE user_id = $1
 `
 
@@ -101,38 +95,36 @@ func (q *Queries) GetUserByID(ctx context.Context, userID pgtype.UUID) (User, er
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.DisplayName,
+		&i.Username,
 		&i.UserType,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
 		&i.Metadata,
-		&i.Username,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT user_id, email, password_hash, display_name, user_type, status, created_at, updated_at, last_login_at, metadata, username FROM users
+SELECT user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata FROM users
 WHERE username = $1
 `
 
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+func (q *Queries) GetUserByUsername(ctx context.Context, username pgtype.Text) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.DisplayName,
+		&i.Username,
 		&i.UserType,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
 		&i.Metadata,
-		&i.Username,
 	)
 	return i, err
 }
@@ -145,13 +137,13 @@ SET email = $1,
     user_type = 'registered',
     updated_at = NOW()
 WHERE user_id = $4
-RETURNING user_id, email, password_hash, display_name, user_type, status, created_at, updated_at, last_login_at, metadata, username
+RETURNING user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata
 `
 
 type PromoteGuestToRegisteredParams struct {
 	Email        pgtype.Text `json:"email"`
 	PasswordHash pgtype.Text `json:"password_hash"`
-	Username     string      `json:"username"`
+	Username     pgtype.Text `json:"username"`
 	UserID       pgtype.UUID `json:"user_id"`
 }
 
@@ -167,14 +159,13 @@ func (q *Queries) PromoteGuestToRegistered(ctx context.Context, arg PromoteGuest
 		&i.UserID,
 		&i.Email,
 		&i.PasswordHash,
-		&i.DisplayName,
+		&i.Username,
 		&i.UserType,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.LastLoginAt,
 		&i.Metadata,
-		&i.Username,
 	)
 	return i, err
 }
@@ -206,4 +197,35 @@ WHERE user_id = $1
 func (q *Queries) UpdateUserLogin(ctx context.Context, userID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, updateUserLogin, userID)
 	return err
+}
+
+const updateUsername = `-- name: UpdateUsername :one
+UPDATE users
+SET username = $1,
+    updated_at = NOW()
+WHERE user_id = $2 AND username IS NULL
+RETURNING user_id, email, password_hash, username, user_type, status, created_at, updated_at, last_login_at, metadata
+`
+
+type UpdateUsernameParams struct {
+	Username pgtype.Text `json:"username"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) UpdateUsername(ctx context.Context, arg UpdateUsernameParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUsername, arg.Username, arg.UserID)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Username,
+		&i.UserType,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastLoginAt,
+		&i.Metadata,
+	)
+	return i, err
 }

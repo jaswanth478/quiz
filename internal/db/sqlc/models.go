@@ -74,12 +74,11 @@ type User struct {
 	UserID       pgtype.UUID        `json:"user_id"`
 	Email        pgtype.Text        `json:"email"`
 	PasswordHash pgtype.Text        `json:"password_hash"`
-	DisplayName  string             `json:"display_name"`
+	Username     pgtype.Text        `json:"username"`
 	UserType     string             `json:"user_type"`
 	Status       string             `json:"status"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 	LastLoginAt  pgtype.Timestamptz `json:"last_login_at"`
 	Metadata     []byte             `json:"metadata"`
-	Username     string             `json:"username"`
 }

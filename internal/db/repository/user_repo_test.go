@@ -35,8 +35,22 @@ func (m *mockUserStore) GetUserByID(ctx context.Context, userID pgtype.UUID) (sq
 	return args.Get(0).(sqlcgen.User), args.Error(1)
 }
 
+func (m *mockUserStore) GetUserByUsername(ctx context.Context, username pgtype.Text) (sqlcgen.User, error) {
+	args := m.Called(ctx, username)
+	return args.Get(0).(sqlcgen.User), args.Error(1)
+}
+
 func (m *mockUserStore) UpdateUserLogin(ctx context.Context, userID pgtype.UUID) error {
 	return m.Called(ctx, userID).Error(0)
+}
+
+func (m *mockUserStore) UpdatePassword(ctx context.Context, arg sqlcgen.UpdatePasswordParams) error {
+	return m.Called(ctx, arg).Error(0)
+}
+
+func (m *mockUserStore) UpdateUsername(ctx context.Context, arg sqlcgen.UpdateUsernameParams) (sqlcgen.User, error) {
+	args := m.Called(ctx, arg)
+	return args.Get(0).(sqlcgen.User), args.Error(1)
 }
 
 func TestUserRepository_CreateRegisteredUser(t *testing.T) {
@@ -46,13 +60,13 @@ func TestUserRepository_CreateRegisteredUser(t *testing.T) {
 	params := sqlcgen.CreateUserParams{
 		Email:        pgtype.Text{String: "user@example.com", Valid: true},
 		PasswordHash: pgtype.Text{String: "hashed", Valid: true},
-		DisplayName:  pgtype.Text{String: "Ace", Valid: true},
+		Username:     pgtype.Text{String: "ace", Valid: true},
 		UserType:     pgtype.Text{String: "registered", Valid: true},
 	}
 	expect := sqlcgen.User{
-		UserID:      uuidFromByte(1),
-		DisplayName: "Ace",
-		UserType:    "registered",
+		UserID:   uuidFromByte(1),
+		Username: pgtype.Text{String: "ace", Valid: true},
+		UserType: "registered",
 	}
 
 	store.On("CreateUser", mock.Anything, params).Return(expect, nil)
@@ -69,7 +83,7 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 	repo := NewUserRepository(store)
 
 	email := pgtype.Text{String: "user@example.com", Valid: true}
-	expect := sqlcgen.User{UserID: uuidFromByte(2), DisplayName: "Ace"}
+	expect := sqlcgen.User{UserID: uuidFromByte(2), Username: pgtype.Text{String: "ace", Valid: true}}
 
 	store.On("GetUserByEmail", mock.Anything, email).Return(expect, nil)
 
@@ -87,6 +101,7 @@ func TestUserRepository_PromoteGuest(t *testing.T) {
 	params := sqlcgen.PromoteGuestToRegisteredParams{
 		Email:        pgtype.Text{String: "upgraded@example.com", Valid: true},
 		PasswordHash: pgtype.Text{String: "hashed", Valid: true},
+		Username:     pgtype.Text{}, // NULL - will be set later
 		UserID:       uuidFromByte(3),
 	}
 	expect := sqlcgen.User{UserID: params.UserID, UserType: "registered"}

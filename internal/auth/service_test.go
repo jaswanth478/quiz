@@ -92,9 +92,9 @@ func TestService_Register(t *testing.T) {
 	pgUserID.Scan(userID)
 
 	createdUser := sqlcgen.User{
-		UserID:      pgUserID,
-		DisplayName: "Test User",
-		UserType:    "registered",
+		UserID:   pgUserID,
+		Username: pgtype.Text{String: "testuser", Valid: true},
+		UserType: "registered",
 	}
 	repo.On("CreateRegisteredUser", mock.Anything, mock.Anything).Return(createdUser, nil)
 

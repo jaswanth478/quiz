@@ -140,8 +140,8 @@ func (s *OAuthService) CreateOrGetOAuthUser(ctx context.Context, authSvc *Servic
 		// User exists, return with tokens
 		userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 		username := ""
-		if dbUser.Username != "" {
-			username = dbUser.Username
+		if dbUser.Username.Valid {
+			username = dbUser.Username.String
 		}
 		
 		user := &User{
@@ -187,8 +187,8 @@ func (s *OAuthService) CreateOrGetOAuthUser(ctx context.Context, authSvc *Servic
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 	username := ""
-	if dbUser.Username != "" {
-		username = dbUser.Username
+	if dbUser.Username.Valid {
+		username = dbUser.Username.String
 	}
 	
 	user := &User{

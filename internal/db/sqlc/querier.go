@@ -19,7 +19,7 @@ type Querier interface {
 	GetQuestionPool(ctx context.Context, limit int32) ([]Question, error)
 	GetUserByEmail(ctx context.Context, email pgtype.Text) (User, error)
 	GetUserByID(ctx context.Context, userID pgtype.UUID) (User, error)
-	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserByUsername(ctx context.Context, username pgtype.Text) (User, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertLeaderboardSnapshot(ctx context.Context, arg InsertLeaderboardSnapshotParams) (LeaderboardSnapshot, error)
 	InsertQuestion(ctx context.Context, arg InsertQuestionParams) (Question, error)
@@ -30,6 +30,7 @@ type Querier interface {
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
 	UpdatePlayerMatchResult(ctx context.Context, arg UpdatePlayerMatchResultParams) error
 	UpdateUserLogin(ctx context.Context, userID pgtype.UUID) error
+	UpdateUsername(ctx context.Context, arg UpdateUsernameParams) (User, error)
 	UpsertQuestionVerification(ctx context.Context, arg UpsertQuestionVerificationParams) (Question, error)
 }
 

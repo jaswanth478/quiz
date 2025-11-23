@@ -304,15 +304,15 @@ func (h *HTTPHandlers) GetMe(w http.ResponseWriter, r *http.Request) {
 		var pgUserID pgtype.UUID
 		pgUserID.Scan(claims.UserID)
 		dbUser, err := h.authSvc.userRepo.GetByID(r.Context(), pgUserID)
-		if err == nil {
-			if dbUser.Username != "" {
-				username = dbUser.Username
-				usernameRequired = false
-			} else {
-				username = ""
-				usernameRequired = true
-			}
+	if err == nil {
+		if dbUser.Username.Valid && dbUser.Username.String != "" {
+			username = dbUser.Username.String
+			usernameRequired = false
+		} else {
+			username = ""
+			usernameRequired = true
 		}
+	}
 	}
 
 	h.respondJSON(w, http.StatusOK, map[string]interface{}{

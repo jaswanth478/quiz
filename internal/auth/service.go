@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -96,8 +96,8 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*User, *To
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 	username := ""
-	if dbUser.Username != "" {
-		username = dbUser.Username
+	if dbUser.Username.Valid {
+		username = dbUser.Username.String
 	}
 	
 	user := &User{
@@ -140,8 +140,8 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*User, *TokenPai
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 	username := ""
-	if dbUser.Username != "" {
-		username = dbUser.Username
+	if dbUser.Username.Valid {
+		username = dbUser.Username.String
 	}
 	
 	user := &User{
@@ -176,11 +176,11 @@ func (s *Service) generateGuestUsername(ctx context.Context) (string, error) {
 	
 	for i := 0; i < maxAttempts; i++ {
 		// Generate random 6-8 character suffix
-		length := 6 + rand.Intn(3) // 6, 7, or 8
+		length := 6 + mathrand.Intn(3) // 6, 7, or 8
 		chars := "abcdefghijklmnopqrstuvwxyz0123456789"
 		suffix := make([]byte, length)
 		for j := range suffix {
-			suffix[j] = chars[rand.Intn(len(chars))]
+			suffix[j] = chars[mathrand.Intn(len(chars))]
 		}
 		
 		username := fmt.Sprintf("guest_%s", string(suffix))
@@ -269,7 +269,7 @@ func (s *Service) ConvertGuest(ctx context.Context, req ConvertGuestRequest) (*U
 		UserID:       pgGuestID,
 		Email:        pgEmail,
 		PasswordHash: pgHash,
-		Username:     "", // NULL - will be set later via SetUsername endpoint
+		Username:     pgtype.Text{}, // NULL - will be set later via SetUsername endpoint
 	}
 
 	dbUser, err := s.userRepo.PromoteGuest(ctx, convertParams)
@@ -279,8 +279,8 @@ func (s *Service) ConvertGuest(ctx context.Context, req ConvertGuestRequest) (*U
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 	username := ""
-	if dbUser.Username != "" {
-		username = dbUser.Username
+	if dbUser.Username.Valid {
+		username = dbUser.Username.String
 	}
 	
 	user := &User{
@@ -319,8 +319,8 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 
 	userID, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
 	username := ""
-	if dbUser.Username != "" {
-		username = dbUser.Username
+	if dbUser.Username.Valid {
+		username = dbUser.Username.String
 	}
 	
 	user := &User{
@@ -374,14 +374,19 @@ func (s *Service) SetUsername(ctx context.Context, userID uuid.UUID, username st
 	}
 	
 	// Check if update actually happened (username was NULL before)
-	if dbUser.Username != username {
+	if !dbUser.Username.Valid || dbUser.Username.String != username {
 		return nil, fmt.Errorf("username already set or user not found")
 	}
 	
 	userIDFromDB, _ := uuid.FromBytes(dbUser.UserID.Bytes[:])
+	usernameStr := ""
+	if dbUser.Username.Valid {
+		usernameStr = dbUser.Username.String
+	}
+	
 	user := &User{
 		ID:          userIDFromDB,
-		Username:    dbUser.Username,
+		Username:    usernameStr,
 		UserType:    dbUser.UserType,
 		IsGuest:     dbUser.UserType == "guest",
 	}
@@ -554,7 +559,7 @@ func (s *Service) GenerateUsernameSuggestions(ctx context.Context, username stri
 	if len(suggestions) < 3 {
 		for len(suggestions) < 3 {
 			// Generate random 3-digit suffix
-			randomSuffix := rand.Intn(900) + 100 // 100-999
+			randomSuffix := mathrand.Intn(900) + 100 // 100-999
 			candidate := fmt.Sprintf("%s_%d", username, randomSuffix)
 			
 			// Check if already in suggestions

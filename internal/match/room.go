@@ -144,7 +144,7 @@ func (r *RoomManager) JoinRoom(ctx context.Context, roomCode string, userID uuid
 
 	room.Players = append(room.Players, RoomPlayer{
 		UserID:   userID,
-		Username: displayName,
+		Username: username,
 		IsGuest:  isGuest,
 		JoinedAt: time.Now(),
 	})
